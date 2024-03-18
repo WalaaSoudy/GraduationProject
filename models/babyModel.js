@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const validator = require('validator');
+
 const BabySchema = new mongoose.Schema({
     name: {
         type: String,
@@ -20,12 +22,15 @@ const BabySchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide an email'],
         unique: true,
-        vakidate : [validator.isEmail, 'Please provide a valid email']
+        validate : [validator.isEmail, 'Please provide a valid email']
     },
     password:{
         type: String,
         required: [true, 'Please provide a password']
         
+    },
+    token : {
+        type: String
     }
 },{timestamps: true});
 

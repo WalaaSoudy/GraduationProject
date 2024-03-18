@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const validator = require('validator');
+
 const DoctorSchema = new mongoose.Schema({
     firstName: {
         type: String,
@@ -36,6 +38,9 @@ const DoctorSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide a password']
     },
+    token : {
+        type: String
+    }
 },{timestamps: true});
 
 const DoctorModel = mongoose.model('Doctor', DoctorSchema);

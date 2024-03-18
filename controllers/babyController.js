@@ -2,19 +2,26 @@ const Baby = require('../models/babyModel');
 const asyncHandler = require('express-async-handler');
 const ApiError = require('../utils/ApiError');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-exports.getallbabies = asyncHandler(async (req, res, next) => {
-    const babies = await Baby.find();
+exports.getAllBabies = asyncHandler(async (req, res, next) => {
+    const limit = req.params.limit
+    const page = req.params.page
+    const skip = (page - 1) * limit
+    const babies = await Baby.find({},{"__v":false,'password':false}).limit(limit).skip(skip);
+    if (!babies) {
+        return next(new ApiError(`No Baby found`, 404));
+    }
     res.status(200).json({
-        success: true,
+        status: 'success',
         data: babies
     });
 });
 
-exports.getbaby = asyncHandler(async (req, res, next) => {
+exports.getSpecificBaby = asyncHandler(async (req, res, next) => {
     const baby = await Baby.findById(req.params.id);
     if (!baby) {
-        return next(new ApiError('Baby not found', 404));
+        return next(new ApiError(`No baby found with id ${req.params.id}`, 404));
     }
     res.status(200).json({
         success: true,
@@ -22,31 +29,29 @@ exports.getbaby = asyncHandler(async (req, res, next) => {
     });
 });
 
-exports.createbaby = asyncHandler(async (req, res, next) => {
+exports.register = asyncHandler(async (req, res, next) => {
     const { name, birthdate, gender, address, email, password } = req.body;
-    const baby = await Baby.create({
-        name,
-        birthdate,
-        gender,
-        address,
-        email,
-        password
-    });
-    
+    const salt = await bcrypt.genSalt(7);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const baby = new Baby({name, birthdate, gender, address, email, password: hashedPassword});
+    const token = jwt.sign({email: baby.email, id :baby._id}, process.env.JWT_SECRET);
+    baby.token = token;
+
+    await baby.save();
     res.status(201).json({
-        success: true,
+        status: 'success',
         data: baby
     });
 });
 
 
-exports.updatebaby = asyncHandler(async (req, res, next) => {
+exports.updateBaby = asyncHandler(async (req, res, next) => {
     const baby = await Baby.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
         runValidators: true
     });
     if (!baby) {
-        return next(new ApiError('Baby not found', 404));
+        return next(new ApiError(`No baby found with id ${req.params.id}`, 404));
     }
     res.status(200).json({
         success: true,
@@ -54,29 +59,34 @@ exports.updatebaby = asyncHandler(async (req, res, next) => {
     });
 });
 
-exports.deletebaby = asyncHandler(async (req, res, next) => {
-
+exports.deleteBaby = asyncHandler(async (req, res, next) => {
     const baby = await Baby.findByIdAndDelete(req.params.id);
     if (!baby) {
-        return next(new ApiError('Baby not found', 404));
+        return next(new ApiError(`No baby found with id ${req.params.id}`, 404));
     }
     res.status(200).json({
         success: true,
-        data: {}
+        data: "Baby is deleted successfully"
     });
 });
 
 exports.login = asyncHandler(async (req, res, next) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-        return next(new ApiError('Please provide email and password', 400));
+    const {email, password} = req.body;
+    const baby = await Baby.findOne({email: email});
+    if (!baby) {
+        return next(new ApiError(`Invalid email or password`, 401));
     }
-    const baby = await Baby.findOne({ email }).select('+password');
-    if (!baby || !(await baby.matchPassword(password))) {
-        return next(new ApiError('Invalid credentials', 401));
+    const isMatch = await bcrypt.compare(password, baby.password);
+    if (!isMatch) {
+        return next(new ApiError(`Invalid email or password`, 401));
     }
+    const token = jwt.sign({email: baby.email, id :baby._id}, process.env.JWT_SECRET);
+    baby.token = token;
+    await baby.save();
+
     res.status(200).json({
-        success: true,
+        status: 'success',
         data: baby
     });
+    
 });
